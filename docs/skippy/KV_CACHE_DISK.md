@@ -11,9 +11,15 @@ This is a different cache from the in-memory OpenAI prompt-prefix cache
 documented in [PROMPT_CACHE.md](PROMPT_CACHE.md). That one lives in the serving
 process; this one is the on-disk L3 store described here.
 
-The tier is **fail-open for inference**: if the cache is misconfigured,
-unavailable, or full, the node logs a warning and serves with cold prefill. It
-never blocks generation.
+**Fail-closed configuration, fail-open runtime.** Invalid disk-cache
+*configuration* fails **closed**: config validation and resolution reject bad
+values — fixed mode without a budget, a non-IEC or zero size, a relative
+directory, or a minimum-free reserve below 1 GiB — by returning an error, so a
+node refuses to start on a broken cache setting rather than silently ignoring
+it. A *valid* configuration is then **fail-open for inference**: if the store
+cannot open, reaches low space, or cannot admit a write, the node logs a warning
+and serves with cold prefill. Valid runtime unavailability never blocks
+generation.
 
 ## Modes and safe defaults
 
@@ -227,7 +233,7 @@ external tampering) — investigate the filesystem; the cache itself stays safe.
 | `auto` mode caches nothing | Auto budget resolved to `0` — filesystem at/below `minimum_free` | Free space or lower `--kv-cache-min-free` (floor 1 GiB). `status` shows `degraded`/`budget_below_entry_floor`. |
 | Writes refused, reads still work | At the minimum-free reserve | `status` state `read_only_low_space`; free disk, `prune`, or lower `minimum_free`. |
 | Startup fails to open the cache | Another process holds the root lock | Only one node per cache root; point the second node at a different `directory`. |
-| "must use an explicit IEC suffix" / "must be an absolute path" | Bare number or relative path in a size/dir setting | Use `32GiB` (not `32`/`32GB`) and absolute directories. |
+| Node refuses to start with a config/resolution error (e.g. "must use an explicit IEC suffix", "must be an absolute path", "fixed disk prompt-cache mode requires a positive budget", minimum-free below 1 GiB) | **Invalid configuration** — rejected up front, not a runtime fallback | Fix the value: use `32GiB` (not `32`/`32GB`), absolute directories, a positive `budget_mib` under `fixed`, and `minimum_free ≥ 1GiB`. These are config errors, distinct from the store being unavailable at runtime. |
 | Deprecation warning about `SKIPPY_L3_*` | Legacy env vars in use | Migrate to `[runtime.kv_cache.disk]` or `MESH_LLM_KV_CACHE_*`. |
 | Config reload didn't move the cache / toggle the mode | `mode`/`directory` are restart-only | Restart the node; only `budget`/`minimum_free` apply live. |
 | `quarantined_objects` climbing | Segments failing digest verification | Inspect the underlying storage; entries fall back to cold prefill, cache stays safe. |
