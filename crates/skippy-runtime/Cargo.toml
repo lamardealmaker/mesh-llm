@@ -12,6 +12,7 @@ default = []
 dynamic-native-runtime = ["skippy-ffi/dynamic-runtime"]
 
 [dependencies]
+crossbeam-queue.workspace = true
 anyhow.workspace = true
 skippy-ffi = { path = "../skippy-ffi", version = "0.76.0", default-features = false  }
 skippy-model = { path = "../skippy-model", version = "0.76.0" }
